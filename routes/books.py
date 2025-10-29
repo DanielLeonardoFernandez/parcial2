@@ -3,7 +3,7 @@ from sqlmodel import Session
 from typing import List, Optional
 
 from db import get_session
-from models import Book, BookCreate, BookRead  # las clases están en models.py
+from models import Book, BookCreate, BookRead, AuthorRead  # las clases están en models.py
 import crud  # usa las funciones create_book, get_books, get_book_by_id, update_book, soft_delete_book
 
 router = APIRouter(prefix="/books", tags=["Books"])
@@ -54,3 +54,22 @@ def delete_book_endpoint(book_id: int, session: Session = Depends(get_session)):
     Soft delete de un book (marca is_active=False).
     """
     return crud.soft_delete_book(session, book_id)
+
+# ---------------------------------------------------
+# Obtener los autores asociados a un libro específico
+# ---------------------------------------------------
+@router.get("/{book_id}/authors", response_model=list[AuthorRead])
+def get_authors_by_book(book_id: int, session: Session = Depends(get_session)):
+    """
+    Retorna todos los autores activos asociados a un libro específico.
+    """
+    book = crud.get_book_by_id(session, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Libro no encontrado")
+
+    # Filtrar solo autores activos
+    active_authors = [author for author in book.authors if author.is_active]
+    if not active_authors:
+        raise HTTPException(status_code=404, detail="El libro no tiene autores activos asociados.")
+
+    return active_authors
