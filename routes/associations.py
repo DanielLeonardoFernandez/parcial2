@@ -41,3 +41,38 @@ def create_association(book_id: int, author_id: int, session: Session = Depends(
     return {"message": f"Asociación creada: Libro {book_id} ↔ Autor {author_id}"}
 
 
+# -------------------------
+#       Listar asociaciones
+# -------------------------
+@router.get("/")
+def list_associations(session: Session = Depends(get_session)):
+    """
+    Lista todas las asociaciones libro-autor activas.
+    """
+    associations = session.exec(select(BookAuthorLink)).all()
+    if not associations:
+        raise HTTPException(status_code=404, detail="No existen asociaciones registradas.")
+    return associations
+
+
+# -------------------------
+#       Eliminar asociación
+# -------------------------
+@router.delete("/", status_code=200)
+def delete_association(book_id: int, author_id: int, session: Session = Depends(get_session)):
+    """
+    Elimina la relación entre un libro y un autor.
+    """
+    link = session.exec(
+        select(BookAuthorLink).where(
+            BookAuthorLink.book_id == book_id,
+            BookAuthorLink.author_id == author_id
+        )
+    ).first()
+
+    if not link:
+        raise HTTPException(status_code=404, detail="Asociación no encontrada.")
+
+    session.delete(link)
+    session.commit()
+    return {"message": f"Asociación eliminada: Libro {book_id} ↔ Autor {author_id}"}
