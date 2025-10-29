@@ -3,10 +3,11 @@ from sqlmodel import Session
 from typing import List, Optional
 
 from db import get_session
-from models import Book, BookCreate, BookRead, AuthorRead
+from schemas import BookCreate, BookRead, AuthorRead
 import crud
 
 router = APIRouter(prefix="/books", tags=["Books"])
+
 
 # ---------------------------------------------------
 # Crear un nuevo libro
@@ -15,9 +16,15 @@ router = APIRouter(prefix="/books", tags=["Books"])
 def create_book_endpoint(data: BookCreate, session: Session = Depends(get_session)):
     """
     Crear un nuevo libro y asociarlo con autores (author_ids en BookCreate).
+
+    - **title**: título del libro
+    - **isbn**: ISBN válido (10 o 13 dígitos, se permiten guiones)
+    - **year_publication**: año de publicación
+    - **copies_available**: número de copias disponibles (>=0)
+    - **author_ids**: lista de IDs de autores asociados
     """
-    book = Book.from_orm(data)
-    return crud.create_book(session, book, data.author_ids or [])
+    book = crud.create_book(session, data, data.author_ids or [])
+    return BookRead.from_orm(book)
 
 
 # ---------------------------------------------------
@@ -29,13 +36,14 @@ def list_books_endpoint(
     session: Session = Depends(get_session)
 ):
     """
-    Listar todos los libros activos. Opcional: ?year=YYYY
+    Listar todos los libros activos. Opcionalmente filtrar por año de publicación.
     """
-    return crud.get_books(session, year)
+    books = crud.get_books(session, year)
+    return [BookRead.from_orm(b) for b in books]
 
 
 # ---------------------------------------------------
-# Obtener libros disponibles (debe ir antes de /{book_id})
+# Obtener libros disponibles
 # ---------------------------------------------------
 @router.get("/available", response_model=List[BookRead])
 def get_available_books(session: Session = Depends(get_session)):
@@ -45,19 +53,7 @@ def get_available_books(session: Session = Depends(get_session)):
     books = crud.get_available_books(session)
     if not books:
         raise HTTPException(status_code=404, detail="No hay libros disponibles actualmente.")
-
-    return [
-        BookRead(
-            id=b.id,
-            title=b.title,
-            isbn=b.isbn,
-            year_publication=b.year_publication,
-            copies_available=b.copies_available,
-            is_active=b.is_active,
-            authors=b.authors
-        )
-        for b in books
-    ]
+    return [BookRead.from_orm(b) for b in books]
 
 
 # ---------------------------------------------------
@@ -69,14 +65,10 @@ def get_authors_by_book(book_id: int, session: Session = Depends(get_session)):
     Retorna todos los autores activos asociados a un libro específico.
     """
     book = crud.get_book_by_id(session, book_id)
-    if not book:
-        raise HTTPException(status_code=404, detail="Libro no encontrado")
-
-    active_authors = [author for author in book.authors if author.is_active]
+    active_authors = [a for a in book.authors if a.is_active]
     if not active_authors:
         raise HTTPException(status_code=404, detail="El libro no tiene autores activos asociados.")
-
-    return active_authors
+    return [AuthorRead.from_orm(a) for a in active_authors]
 
 
 # ---------------------------------------------------
@@ -87,7 +79,8 @@ def get_book_endpoint(book_id: int, session: Session = Depends(get_session)):
     """
     Obtener un libro por ID (incluye autores asociados).
     """
-    return crud.get_book_by_id(session, book_id)
+    book = crud.get_book_by_id(session, book_id)
+    return BookRead.from_orm(book)
 
 
 # ---------------------------------------------------
@@ -96,10 +89,14 @@ def get_book_endpoint(book_id: int, session: Session = Depends(get_session)):
 @router.put("/{book_id}", response_model=BookRead)
 def update_book_endpoint(book_id: int, data: BookCreate, session: Session = Depends(get_session)):
     """
-    Actualizar un libro. Se valida ISBN único y copias >= 0.
+    Actualizar un libro existente.
+
+    - Valida ISBN único
+    - Copias >= 0
+    - No permite modificar directamente author_ids aquí
     """
-    payload = data.dict()
-    return crud.update_book(session, book_id, payload)
+    updated = crud.update_book(session, book_id, data.dict(exclude={"author_ids"}))
+    return BookRead.from_orm(updated)
 
 
 # ---------------------------------------------------
@@ -108,6 +105,6 @@ def update_book_endpoint(book_id: int, data: BookCreate, session: Session = Depe
 @router.delete("/{book_id}")
 def delete_book_endpoint(book_id: int, session: Session = Depends(get_session)):
     """
-    Soft delete de un libro (marca is_active=False).
+    Realizar un *soft delete* de un libro (marca is_active=False).
     """
     return crud.soft_delete_book(session, book_id)

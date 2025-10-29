@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from db import get_session
 from models import BookAuthorLink, Book, Author
@@ -6,17 +6,17 @@ from models import BookAuthorLink, Book, Author
 router = APIRouter(prefix="/associations", tags=["Asociaciones"])
 
 
-# -------------------------
-#       Crear asociación
-# -------------------------
+# ---------------------------------------------------
+# Crear una asociación libro-autor
+# ---------------------------------------------------
 @router.post("/", status_code=201)
 def create_association(book_id: int, author_id: int, session: Session = Depends(get_session)):
     """
     Crea una relación entre un libro y un autor.
-    - book_id: ID del libro.
-    - author_id: ID del autor.
+
+    - **book_id**: ID del libro
+    - **author_id**: ID del autor
     """
-    # Validar existencia de libro y autor
     book = session.get(Book, book_id)
     author = session.get(Author, author_id)
 
@@ -25,7 +25,6 @@ def create_association(book_id: int, author_id: int, session: Session = Depends(
     if not author or not author.is_active:
         raise HTTPException(status_code=404, detail="Autor no encontrado o inactivo.")
 
-    # Verificar si ya existe la asociación
     existing = session.exec(
         select(BookAuthorLink).where(
             BookAuthorLink.book_id == book_id,
@@ -38,16 +37,18 @@ def create_association(book_id: int, author_id: int, session: Session = Depends(
     link = BookAuthorLink(book_id=book_id, author_id=author_id)
     session.add(link)
     session.commit()
+    session.refresh(link)
+
     return {"message": f"Asociación creada: Libro {book_id} ↔ Autor {author_id}"}
 
 
-# -------------------------
-#       Listar asociaciones
-# -------------------------
+# ---------------------------------------------------
+# Listar todas las asociaciones
+# ---------------------------------------------------
 @router.get("/")
 def list_associations(session: Session = Depends(get_session)):
     """
-    Lista todas las asociaciones libro-autor activas.
+    Lista todas las asociaciones libro-autor existentes.
     """
     associations = session.exec(select(BookAuthorLink)).all()
     if not associations:
@@ -55,13 +56,16 @@ def list_associations(session: Session = Depends(get_session)):
     return associations
 
 
-# -------------------------
-#       Eliminar asociación
-# -------------------------
+# ---------------------------------------------------
+# Eliminar una asociación libro-autor
+# ---------------------------------------------------
 @router.delete("/", status_code=200)
 def delete_association(book_id: int, author_id: int, session: Session = Depends(get_session)):
     """
     Elimina la relación entre un libro y un autor.
+
+    - **book_id**: ID del libro
+    - **author_id**: ID del autor
     """
     link = session.exec(
         select(BookAuthorLink).where(
@@ -69,7 +73,6 @@ def delete_association(book_id: int, author_id: int, session: Session = Depends(
             BookAuthorLink.author_id == author_id
         )
     ).first()
-
     if not link:
         raise HTTPException(status_code=404, detail="Asociación no encontrada.")
 

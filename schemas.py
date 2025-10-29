@@ -1,6 +1,8 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field, validator
 import re
+from sqlmodel import SQLModel, Field
+
 
 # -------------------------
 #       SCHEMAS AUTHOR
@@ -10,9 +12,14 @@ class AuthorBase(BaseModel):
     country: Optional[str] = Field(default=None, max_length=100)
     birth_year: Optional[int] = Field(default=None, ge=0, le=9999)
 
+class AuthorCreate(SQLModel):
+    name: str
+    country: Optional[str] = None
+    birth_year: Optional[int] = None
 
-class AuthorCreate(AuthorBase):
-    pass
+    class Config:
+        from_attributes = True
+
 
 
 class AuthorUpdate(BaseModel):
@@ -21,12 +28,18 @@ class AuthorUpdate(BaseModel):
     birth_year: Optional[int] = Field(default=None, ge=0, le=9999)
 
 
-class AuthorRead(AuthorBase):
+from sqlmodel import SQLModel, Field
+from typing import Optional, List
+
+class AuthorRead(SQLModel):
     id: int
+    name: str
+    country: Optional[str] = None
+    birth_year: Optional[int] = None
     is_active: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True  # ✅ Esto permite usar from_orm()
 
 
 # -------------------------
@@ -67,14 +80,17 @@ class BookUpdate(BaseModel):
         return v
 
 
-class BookRead(BookBase):
+class BookRead(SQLModel):
     id: int
+    title: str
+    isbn: str
+    year_publication: Optional[int] = None
+    copies_available: int
     is_active: bool
     authors: List[AuthorRead] = []
 
     class Config:
-        orm_mode = True
-
+        from_attributes = True
 
 # -------------------------
 #       SCHEMA BOOKAUTHORLINK (opcional)
