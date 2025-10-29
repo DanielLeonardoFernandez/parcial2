@@ -25,7 +25,10 @@ def get_authors(session: Session, country: str | None = None):
     query = select(Author).where(Author.is_active == True)
     if country:
         query = query.where(Author.country == country)
-    return session.exec(query).all()
+    authors = session.exec(query).all()
+    if not authors:
+        raise HTTPException(status_code=404, detail="No se encontraron autores activos.")
+    return authors
 
 
 def get_author_by_id(session: Session, author_id: int):
@@ -95,7 +98,10 @@ def get_books(session: Session, year: int | None = None):
     query = select(Book).where(Book.is_active == True)
     if year:
         query = query.where(Book.year_publication == year)
-    return session.exec(query).all()
+    books = session.exec(query).all()
+    if not books:
+        raise HTTPException(status_code=404, detail="No se encontraron libros activos.")
+    return books
 
 
 def get_book_by_id(session: Session, book_id: int):
@@ -110,6 +116,10 @@ def update_book(session: Session, book_id: int, data: dict):
     book = session.get(Book, book_id)
     if not book or not book.is_active:
         raise HTTPException(status_code=404, detail="Book not found")
+
+    # 🚨 Validar si no se envió ningún dato para actualizar
+    if not data:
+        raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar el libro.")
 
     # Evitar que se intente asignar author_ids directamente
     data.pop("author_ids", None)
