@@ -4,6 +4,7 @@ from typing import List, Optional
 from db import get_session
 from models import Author, AuthorCreate, AuthorRead
 import crud
+from models import BookRead
 
 router = APIRouter(prefix="/authors", tags=["Authors"])
 
@@ -55,3 +56,22 @@ def delete_author(author_id: int, session: Session = Depends(get_session)):
     Realizar un *soft delete* del autor (is_active=False).
     """
     return crud.soft_delete_author(session, author_id)
+
+# ---------------------------------------------------
+# Obtener los libros asociados a un autor específico
+# ---------------------------------------------------
+@router.get("/{author_id}/books", response_model=list[BookRead])
+def get_books_by_author(author_id: int, session: Session = Depends(get_session)):
+    """
+    Retorna todos los libros activos asociados a un autor específico.
+    """
+    author = crud.get_author_by_id(session, author_id)
+    if not author:
+        raise HTTPException(status_code=404, detail="Autor no encontrado")
+
+    # Filtrar solo libros activos
+    active_books = [book for book in author.books if book.is_active]
+    if not active_books:
+        raise HTTPException(status_code=404, detail="El autor no tiene libros activos registrados.")
+
+    return active_books
