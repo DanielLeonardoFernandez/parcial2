@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session
+from sqlmodel import Session, select
 from typing import List, Optional
 from db import get_session
 from schemas import AuthorCreate, AuthorRead, BookRead
 import crud
+from models import Author, Book
 
 router = APIRouter(prefix="/authors", tags=["Authors"])
 
