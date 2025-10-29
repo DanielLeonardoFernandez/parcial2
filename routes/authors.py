@@ -12,7 +12,7 @@ router = APIRouter(prefix="/authors", tags=["Authors"])
 # Crear un nuevo autor
 # ---------------------------------------------------
 @router.post("/", response_model=AuthorRead, status_code=201)
-def create_author(data: AuthorCreate, session: Session = Depends(get_session)):
+def create_author_endpoint(data: AuthorCreate, session: Session = Depends(get_session)):
     """
     Crear un nuevo autor en la base de datos.
 
@@ -87,3 +87,4 @@ def get_books_by_author(author_id: int, session: Session = Depends(get_session))
     if not active_books:
         raise HTTPException(status_code=404, detail="El autor no tiene libros activos registrados.")
     return [BookRead.from_orm(b) for b in active_books]
+

@@ -1,24 +1,20 @@
 from sqlmodel import Session, select
 from fastapi import HTTPException, status
 from models import Author, Book
-
+from schemas import AuthorCreate, AuthorRead, BookRead, BookCreate
 
 # -------------------------
 #       CRUD AUTORES
 # -------------------------
 
-def create_author(session: Session, data: Author):
-    # Validar duplicado por nombre y país (opcional)
-    existing = session.exec(
-        select(Author).where(Author.name == data.name, Author.country == data.country)
-    ).first()
-    if existing:
-        raise HTTPException(status_code=409, detail="El autor ya existe en la base de datos.")
 
-    session.add(data)
+def create_author(session: Session, data: AuthorCreate):
+    author = Author.from_orm(data)  # Convierte Pydantic -> SQLModel
+    session.add(author)
     session.commit()
-    session.refresh(data)
-    return data
+    session.refresh(author)
+    return author
+
 
 
 def get_authors(session: Session, country: str | None = None):
@@ -58,20 +54,26 @@ def soft_delete_author(session: Session, author_id: int):
     if not author or not author.is_active:
         raise HTTPException(status_code=404, detail="Autor no encontrado o ya eliminado.")
 
+    # Soft delete del autor
     author.is_active = False
-
-    # Regla de negocio: si un autor es eliminado, los libros se mantienen.
-    # (Se podría agregar que si todos los autores de un libro están inactivos, marcar ese libro inactivo)
-
     session.add(author)
+
+    # Revisar libros asociados
+    for book in author.books:
+        # Verificar si todos los autores del libro están inactivos
+        if all(a.is_active == False for a in book.authors):
+            book.is_active = False
+            session.add(book)
+
     session.commit()
-    return {"message": f"Autor {author.name} marcado como inactivo."}
+    return {"message": f"Autor {author.name} marcado como inactivo y libros afectados revisados."}
+
 
 # -------------------------
 #        CRUD LIBROS
 # -------------------------
 
-def create_book(session: Session, data: Book, author_ids: list[int]):
+def create_book(session: Session, data: BookCreate, author_ids: list[int]):
     # Validar ISBN único
     existing = session.exec(select(Book).where(Book.isbn == data.isbn)).first()
     if existing:
@@ -81,17 +83,27 @@ def create_book(session: Session, data: Book, author_ids: list[int]):
     if data.copies_available < 0:
         raise HTTPException(status_code=400, detail="El número de copias no puede ser negativo.")
 
+    # Crear instancia SQLModel del libro
+    book = Book(
+        title=data.title,
+        isbn=data.isbn,
+        year_publication=data.year_publication,
+        copies_available=data.copies_available
+    )
+
     # Asociar autores si se proporcionan
     if author_ids:
-        authors = session.exec(select(Author).where(Author.id.in_(author_ids), Author.is_active == True)).all()
+        authors = session.exec(
+            select(Author).where(Author.id.in_(author_ids), Author.is_active == True)
+        ).all()
         if not authors:
             raise HTTPException(status_code=404, detail="No se encontraron autores válidos.")
-        data.authors = authors
+        book.authors = authors
 
-    session.add(data)
+    session.add(book)
     session.commit()
-    session.refresh(data)
-    return data
+    session.refresh(book)
+    return book
 
 
 def get_books(session: Session, year: int | None = None):
