@@ -88,3 +88,30 @@ def get_books_by_author(author_id: int, session: Session = Depends(get_session))
         raise HTTPException(status_code=404, detail="El autor no tiene libros activos registrados.")
     return [BookRead.from_orm(b) for b in active_books]
 
+
+# Listar autores eliminados
+@router.get("/deleted", response_model=List[AuthorRead])
+def list_deleted_authors(session: Session = Depends(get_session)):
+    authors = session.exec(select(Author).where(Author.is_active == False)).all()
+    if not authors:
+        raise HTTPException(status_code=404, detail="No hay autores eliminados.")
+    return [AuthorRead.from_orm(a) for a in authors]
+
+
+# Recuperar autor eliminado
+@router.patch("/{author_id}/recover", response_model=AuthorRead)
+def recover_author(author_id: int, session: Session = Depends(get_session)):
+    author = crud.get_author_by_id(session, author_id)
+    if not author or author.is_active:
+        raise HTTPException(status_code=404, detail="Autor no encontrado o ya activo.")
+
+    author.is_active = True
+    # Recuperar libros asociados que estaban eliminados por este autor
+    for book in author.books:
+        if not book.is_active and all(not a.is_active for a in book.authors if a.id != author.id):
+            book.is_active = True
+
+    session.add(author)
+    session.commit()
+    session.refresh(author)
+    return AuthorRead.from_orm(author)
