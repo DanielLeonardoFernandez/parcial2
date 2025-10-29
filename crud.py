@@ -151,3 +151,10 @@ def soft_delete_book(session: Session, book_id: int):
     session.add(book)
     session.commit()
     return {"message": f"Libro '{book.title}' marcado como inactivo."}
+
+def get_available_books(session: Session):
+    """
+    Devuelve todos los libros activos con al menos una copia disponible.
+    """
+    query = select(Book).where(Book.is_active == True, Book.copies_available > 0)
+    return session.exec(query).all()
