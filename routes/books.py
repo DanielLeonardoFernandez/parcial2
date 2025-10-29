@@ -108,3 +108,26 @@ def delete_book_endpoint(book_id: int, session: Session = Depends(get_session)):
     Realizar un *soft delete* de un libro (marca is_active=False).
     """
     return crud.soft_delete_book(session, book_id)
+
+
+# Listar libros eliminados
+@router.get("/deleted", response_model=List[BookRead])
+def list_deleted_books(session: Session = Depends(get_session)):
+    books = session.exec(select(Book).where(Book.is_active == False)).all()
+    if not books:
+        raise HTTPException(status_code=404, detail="No hay libros eliminados.")
+    return [BookRead.from_orm(b) for b in books]
+
+
+# Recuperar libro eliminado
+@router.patch("/{book_id}/recover", response_model=BookRead)
+def recover_book(book_id: int, session: Session = Depends(get_session)):
+    book = crud.get_book_by_id(session, book_id)
+    if not book or book.is_active:
+        raise HTTPException(status_code=404, detail="Libro no encontrado o ya activo.")
+
+    book.is_active = True
+    session.add(book)
+    session.commit()
+    session.refresh(book)
+    return BookRead.from_orm(book)
