@@ -34,6 +34,13 @@ def get_author_by_id(session: Session, author_id: int):
     session.refresh(author)
     return author
 
+def get_author_by_id_include_inactive(session: Session, author_id: int):
+    author = session.get(Author, author_id)
+    if not author:
+        raise HTTPException(status_code=404, detail="Autor no encontrado.")
+    session.refresh(author)
+    return author
+
 
 def update_author(session: Session, author_id: int, data: dict):
     author = session.get(Author, author_id)
@@ -120,6 +127,14 @@ def get_book_by_id(session: Session, book_id: int):
     book = session.get(Book, book_id)
     if not book or not book.is_active:
         raise HTTPException(status_code=404, detail="Libro no encontrado o inactivo.")
+    session.refresh(book)
+    return book
+
+# En crud.py
+def get_book_by_id_include_inactive(session: Session, book_id: int):
+    book = session.get(Book, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Libro no encontrado.")
     session.refresh(book)
     return book
 

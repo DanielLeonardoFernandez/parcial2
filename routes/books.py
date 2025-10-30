@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session
+from sqlmodel import Session, select
 from typing import List, Optional
 from models import Book
 from db import get_session
@@ -54,6 +54,43 @@ def get_available_books(session: Session = Depends(get_session)):
     if not books:
         raise HTTPException(status_code=404, detail="No hay libros disponibles actualmente.")
     return [BookRead.from_orm(b) for b in books]
+
+# Listar libros eliminados
+@router.get("/deleted", response_model=List[BookRead])
+def list_deleted_books(session: Session = Depends(get_session)):
+    """
+    Listar todos los libros que han sido eliminados (is_active=False).
+    """
+    books = session.exec(select(Book).where(Book.is_active == False)).all()
+    if not books:
+        raise HTTPException(status_code=404, detail="No hay libros eliminados.")
+    return [BookRead.from_orm(b) for b in books]
+
+
+# Recuperar libro eliminado
+@router.patch("/{book_id}/recover", response_model=BookRead)
+def recover_book(book_id: int, session: Session = Depends(get_session)):
+    """
+    Recuperar un libro eliminado (marca is_active=True).
+    También reactiva autores asociados si todos estaban eliminados.
+    """
+    # ✅ Usamos la nueva función que permite traer libros inactivos
+    book = crud.get_book_by_id_include_inactive(session, book_id)
+    if book.is_active:
+        raise HTTPException(status_code=400, detail="El libro ya está activo.")
+
+    # Reactivar el libro
+    book.is_active = True
+
+    # Reactivar autores asociados si están inactivos
+    for autor in book.authors:
+        if not autor.is_active:
+            autor.is_active = True
+
+    session.add(book)
+    session.commit()
+    session.refresh(book)
+    return BookRead.from_orm(book)
 
 
 # ---------------------------------------------------
@@ -110,24 +147,3 @@ def delete_book_endpoint(book_id: int, session: Session = Depends(get_session)):
     return crud.soft_delete_book(session, book_id)
 
 
-# Listar libros eliminados
-@router.get("/deleted", response_model=List[BookRead])
-def list_deleted_books(session: Session = Depends(get_session)):
-    books = session.exec(select(Book).where(Book.is_active == False)).all()
-    if not books:
-        raise HTTPException(status_code=404, detail="No hay libros eliminados.")
-    return [BookRead.from_orm(b) for b in books]
-
-
-# Recuperar libro eliminado
-@router.patch("/{book_id}/recover", response_model=BookRead)
-def recover_book(book_id: int, session: Session = Depends(get_session)):
-    book = crud.get_book_by_id(session, book_id)
-    if not book or book.is_active:
-        raise HTTPException(status_code=404, detail="Libro no encontrado o ya activo.")
-
-    book.is_active = True
-    session.add(book)
-    session.commit()
-    session.refresh(book)
-    return BookRead.from_orm(book)
