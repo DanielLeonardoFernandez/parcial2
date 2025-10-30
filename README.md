@@ -6,6 +6,18 @@ Este proyecto desarrollado con **FastAPI** y **SQLModel**, gestiona información
 
 Permite registrar, consultar, actualizar y eliminar libros y autores, además de vincular autores a libros específicos mediante endpoints especializados.
 
+## Cómo Clonarlo:
+
+1. Abre pycharm 
+
+2. Dale a la opcion: Clonar repositorio
+y metes el link que se encuentra en github en el boton **<>code**: https://github.com/DanielLeonardoFernandez/parcial2.git
+
+3. Crea un terminal y pon este comando:   **pip install -r requirements.txt**
+
+4. Con los requerimientos instalados, ahora activa el localhost con este comando: **uvicorn main:app --reload**   
+
+
 ---
 
 ## 🗂️ Modelos y relaciones
