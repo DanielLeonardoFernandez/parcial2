@@ -1,8 +1,7 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, delete
 from fastapi import HTTPException, status
-from models import Author, Book
 from schemas import AuthorCreate, AuthorRead, BookRead, BookCreate
-
+from models import Book, Author, BookAuthorLink
 # -------------------------
 #       CRUD AUTORES
 # -------------------------
@@ -31,8 +30,15 @@ def get_author_by_id(session: Session, author_id: int):
     author = session.get(Author, author_id)
     if not author or not author.is_active:
         raise HTTPException(status_code=404, detail="Autor no encontrado o inactivo.")
+
     session.refresh(author)
+
+    # Filtrar libros inactivos (si existe la relación)
+    if hasattr(author, "books"):
+        author.books = [book for book in author.books if book.is_active]
+
     return author
+
 
 def get_author_by_id_include_inactive(session: Session, author_id: int):
     author = session.get(Author, author_id)
@@ -127,10 +133,16 @@ def get_book_by_id(session: Session, book_id: int):
     book = session.get(Book, book_id)
     if not book or not book.is_active:
         raise HTTPException(status_code=404, detail="Libro no encontrado o inactivo.")
+
     session.refresh(book)
+
+    # Filtrar autores inactivos (si existe la relación)
+    if hasattr(book, "authors"):
+        book.authors = [author for author in book.authors if author.is_active]
+
     return book
 
-# En crud.py
+# busqueda id historico
 def get_book_by_id_include_inactive(session: Session, book_id: int):
     book = session.get(Book, book_id)
     if not book:
@@ -139,30 +151,68 @@ def get_book_by_id_include_inactive(session: Session, book_id: int):
     return book
 
 
+
+
 def update_book(session: Session, book_id: int, data: dict):
+    """
+    Actualiza libro y relaciones many-to-many en tabla BookAuthorLink.
+    - Espera `author_ids` como lista de ints si quieres actualizar autores.
+    - Borra las relaciones previas y crea las nuevas (operación atómica).
+    """
     book = session.get(Book, book_id)
     if not book or not book.is_active:
-        raise HTTPException(status_code=404, detail="Book not found")
+        raise HTTPException(status_code=404, detail="Libro no encontrado o inactivo")
 
-    # 🚨 Validar si no se envió ningún dato para actualizar
     if not data:
         raise HTTPException(status_code=400, detail="No se proporcionaron datos para actualizar el libro.")
 
-    # Evitar que se intente asignar author_ids directamente
-    data.pop("author_ids", None)
-
-    # Validar ISBN si se cambia
+    # Validar ISBN único si cambia
     if "isbn" in data and data["isbn"] != book.isbn:
         existing = session.exec(select(Book).where(Book.isbn == data["isbn"])).first()
         if existing:
-            raise HTTPException(status_code=409, detail="ISBN already exists")
+            raise HTTPException(status_code=409, detail="ISBN ya existente")
 
-    # Validar copias disponibles
+    # Validar copias
     if "copies_available" in data and data["copies_available"] < 0:
-        raise HTTPException(status_code=400, detail="Copies cannot be negative")
+        raise HTTPException(status_code=400, detail="El número de copias no puede ser negativo")
 
+    # --- Manejo de author_ids explícito ---
+    if "author_ids" in data:
+        author_ids = data["author_ids"]
+        if author_ids is None:
+            # si explícitamente mandan null, lo rechazamos
+            raise HTTPException(status_code=400, detail="author_ids must be a list of author IDs")
+
+        if not isinstance(author_ids, list):
+            raise HTTPException(status_code=400, detail="author_ids debe ser una lista de IDs de autores")
+
+        # Validar que todos los autores existen y están activos
+        authors = session.exec(
+            select(Author).where(Author.id.in_(author_ids), Author.is_active == True)
+        ).all()
+
+        if len(authors) != len(author_ids):
+            raise HTTPException(status_code=404, detail="Uno o más autores no existen o están inactivos")
+
+        # Eliminar relaciones previas de forma explícita en la BD
+        session.exec(delete(BookAuthorLink).where(BookAuthorLink.book_id == book.id))
+        session.commit()  # commit para asegurar consistencia antes de insertar nuevas relaciones
+
+        # Insertar nuevas relaciones en la tabla intermedia
+        for a in authors:
+            link = BookAuthorLink(book_id=book.id, author_id=a.id)
+            session.add(link)
+
+        # actualizamos la relación en memoria para que from_orm la vea
+        book.authors = authors
+
+    # Actualizar campos simples
     for key, value in data.items():
-        setattr(book, key, value)
+        if key == "author_ids":
+            continue
+        # solo actualizar si el atributo existe en el modelo
+        if hasattr(book, key):
+            setattr(book, key, value)
 
     try:
         session.add(book)
@@ -170,10 +220,9 @@ def update_book(session: Session, book_id: int, data: dict):
         session.refresh(book)
     except Exception as e:
         session.rollback()
-        raise HTTPException(status_code=500, detail=f"Error updating book: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error actualizando libro: {str(e)}")
 
     return book
-
 
 def soft_delete_book(session: Session, book_id: int):
     book = session.get(Book, book_id)

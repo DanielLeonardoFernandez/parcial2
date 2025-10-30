@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from typing import List, Optional
 from models import Book
 from db import get_session
-from schemas import BookCreate, BookRead, AuthorRead
+from schemas import BookCreate, BookRead, BookUpdate, AuthorRead
 import crud
 
 router = APIRouter(prefix="/books", tags=["Books"])
@@ -124,16 +124,13 @@ def get_book_endpoint(book_id: int, session: Session = Depends(get_session)):
 # Actualizar un libro
 # ---------------------------------------------------
 @router.put("/{book_id}", response_model=BookRead)
-def update_book_endpoint(book_id: int, data: BookCreate, session: Session = Depends(get_session)):
+def update_book_endpoint(book_id: int, data: BookUpdate, session: Session = Depends(get_session)):
     """
-    Actualizar un libro existente.
-
-    - Valida ISBN único
-    - Copias >= 0
-    - No permite modificar directamente author_ids aquí
+    Actualiza los datos de un libro (incluidos los autores asociados).
     """
-    updated = crud.update_book(session, book_id, data.dict(exclude={"author_ids"}))
-    return BookRead.from_orm(updated)
+    update_data = data.dict(exclude_unset=True)
+    book = crud.update_book(session, book_id, update_data)
+    return BookRead.from_orm(book)
 
 
 # ---------------------------------------------------
@@ -142,8 +139,30 @@ def update_book_endpoint(book_id: int, data: BookCreate, session: Session = Depe
 @router.delete("/{book_id}")
 def delete_book_endpoint(book_id: int, session: Session = Depends(get_session)):
     """
-    Realizar un *soft delete* de un libro (marca is_active=False).
+    Realiza un *soft delete* de un libro (marca is_active=False).
+    Valida que las copias disponibles sean coherentes (>= 0).
     """
-    return crud.soft_delete_book(session, book_id)
+    book = crud.get_book_by_id(session, book_id)
+    if not book:
+        raise HTTPException(status_code=404, detail="Libro no encontrado.")
+    if not book.is_active:
+        raise HTTPException(status_code=400, detail="El libro ya está eliminado.")
+
+    # Validar que las copias disponibles no sean negativas
+    if book.copies_available < 0:
+        raise HTTPException(
+            status_code=400,
+            detail="No se puede eliminar el libro porque las copias disponibles son negativas."
+        )
+
+    # Marcar como inactivo (soft delete)
+    book.is_active = False
+
+    session.add(book)
+    session.commit()
+    session.refresh(book)
+
+    return {"message": f"Libro '{book.title}' eliminado correctamente (soft delete)."}
+
 
 

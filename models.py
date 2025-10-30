@@ -7,7 +7,6 @@ import re
 class BookAuthorLink(SQLModel, table=True):
     book_id: int = Field(foreign_key="book.id", primary_key=True)
     author_id: int = Field(foreign_key="author.id", primary_key=True)
-    is_active: bool = Field(default=True)
 
 
 # -------------------------
@@ -61,6 +60,13 @@ class Book(BookBase, table=True):
 
 class BookCreate(BookBase):
     author_ids: Optional[List[int]] = []
+
+class BookUpdate(SQLModel):
+    title: Optional[str] = None
+    isbn: Optional[str] = None
+    year_publication: Optional[int] = None
+    copies_available: Optional[int] = None
+    author_ids: Optional[List[int]] = None
 
 
 class BookRead(BookBase):
