@@ -5,8 +5,9 @@ import re
 
 # Tabla intermedia para relación muchos a muchos
 class BookAuthorLink(SQLModel, table=True):
-    book_id: Optional[int] = Field(default=None, foreign_key="book.id", primary_key=True)
-    author_id: Optional[int] = Field(default=None, foreign_key="author.id", primary_key=True)
+    book_id: int = Field(foreign_key="book.id", primary_key=True)
+    author_id: int = Field(foreign_key="author.id", primary_key=True)
+    is_active: bool = Field(default=True)
 
 
 # -------------------------
