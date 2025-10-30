@@ -1,0 +1,92 @@
+# 📘 Gestión de Libros y Autores (Parcial 2)
+
+## 🧩 Descripción general
+
+Este proyecto desarrollado con **FastAPI** y **SQLModel**, gestiona información de **libros** y **autores**, manteniendo una relación **muchos a muchos** entre ambas entidades.
+
+Permite registrar, consultar, actualizar y eliminar libros y autores, además de vincular autores a libros específicos mediante endpoints especializados.
+
+---
+
+## 🗂️ Modelos y relaciones
+
+### **1. Author**
+
+Representa a un autor dentro del sistema.
+
+| Campo | Tipo de dato | Descripción |
+|--------|-----------|-------------|
+| `id` | int  | Identificador único del autor |
+| `name` | str | Nombre completo del autor |
+| `country` | str | País de origen |
+| `birth_year` | int | Año de nacimiento |
+| `is_active` | bool | Indica si el autor está activo |
+
+🔗 **Relaciones:**
+- Un autor puede estar asociado a **múltiples libros** mediante la tabla intermedia `BookAuthorLink`.
+
+---
+
+### **2. Book**
+
+Representa un libro disponible en el sistema.
+
+| Campo | Tipo de dato | Descripción |
+|--------|-----------|-------------|
+| `id` | int  | Identificador único del libro |
+| `title` | str | Título del libro |
+| `isbn` | str | Código ISBN |
+| `year_publication` | int | Año de publicación |
+| `copies_available` | int | Copias disponibles |
+| `is_active` | bool | Indica si el libro está activo |
+
+🔗 **Relaciones:**
+- Un libro puede tener **uno o varios autores** mediante `BookAuthorLink`.
+
+---
+
+### **3. BookAuthorLink**
+
+Tabla intermedia que implementa la relación **muchos a muchos** entre `Book` y `Author`.
+
+| Campo | Tipo de dato | Descripción |
+|--------|-------|-------------|
+| `book_id` | int  | ID del libro |
+| `author_id` | int  | ID del autor |
+
+---
+
+## 🔗 Relaciones generales del sistema
+
+```mermaid
+    
+⚙️ Endpoints principales
+📚 Books
+Método	Endpoint	Descripción	Cuerpo esperado
+GET	/books/	        Obtiene todos los libros activos	
+GET	/books/{id}	Obtiene un libro específico	
+POST	/books/ 	Crea un nuevo libro	{ "title": "string", "isbn": "string", "year_publication": 0, "copies_available": 0, "author_ids": [1,2] }
+PUT	/books/{id}	Actualiza los datos de un libro y sus autores	Igual que POST
+DELETE	/books/{id}	Desactiva (elimina lógicamente) un libro	—
+
+✍️ Authors
+Método	Endpoint	Descripción	Cuerpo esperado
+GET	/authors/	Lista todos los autores activos
+GET	/authors/{id}	Muestra un autor específico	
+POST	/authors/	Crea un nuevo autor	{ "name": "string", "country": "string", "birth_year": 0 }
+PUT	/authors/{id}	Actualiza los datos de un autor	Igual que POST
+DELETE	/authors/{id}	Desactiva (elimina lógicamente) un autor	—
+
+🧱 Estructura del proyecto
+
+
+    parcial2/
+    ├─ crud.py
+    ├─ db.py
+    ├─ main.py
+    ├─ models.py
+    ├─ schemas.py
+    ├─ requirements.txt
+    └─ routes/
+       ├─ authors.py
+       └─ books.py
