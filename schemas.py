@@ -68,8 +68,7 @@ class BookUpdate(BaseModel):
     isbn: Optional[str] = Field(None, max_length=20)
     year_publication: Optional[int] = Field(None, ge=0, le=9999)
     copies_available: Optional[int] = Field(None, ge=0)
-    author_ids: Optional[List[int]] = None  # ✅ ESTO DEBE ESTAR AQUÍ
-
+    authors: Optional[List[int]] = None
     @validator("isbn")
     def isbn_format(cls, v):
         if v is None:
