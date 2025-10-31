@@ -70,35 +70,63 @@ Tabla intermedia que implementa la relación **muchos a muchos** entre `Book` y 
 
 ## 🔗 Relaciones generales del sistema
 
-```mermaid
+## ⚙️ Endpoints principales
+
+### 📚 **Books**
+
+| Método | Endpoint | Descripción | Cuerpo esperado |
+|--------|-----------|--------------|----------------|
+| **GET** | `/books/` | Obtiene todos los libros activos | - |
+| **GET** | `/books/{id}` | Obtiene un libro específico | - |
+| **POST** | `/books/` | Crea un nuevo libro | `{ "title": "string", "isbn": "string", "year_publication": 0, "copies_available": 0, "authors": [1,2] }` |
+| **PUT** | `/books/{id}` | Actualiza los datos de un libro y sus autores | Igual que POST |
+| **DELETE** | `/books/{id}` | Desactiva (elimina lógicamente) un libro | - |
+
+---
+
+### ✍️ **Authors**
+
+| Método | Endpoint | Descripción | Cuerpo esperado |
+|--------|-----------|--------------|----------------|
+| **GET** | `/authors/` | Lista todos los autores activos | - |
+| **GET** | `/authors/{id}` | Muestra un autor específico | - |
+| **POST** | `/authors/` | Crea un nuevo autor | `{ "name": "string", "country": "string", "birth_year": 0 }` |
+| **PUT** | `/authors/{id}` | Actualiza los datos de un autor | Igual que POST |
+| **DELETE** | `/authors/{id}` | Desactiva (elimina lógicamente) un autor | - |
+
+---
+### 🔗 Associations (Book ↔ Author)
+
+| Método | Endpoint | Descripción | Cuerpo esperado | Respuesta esperada |
+|--------|-----------|--------------|----------------|----------------|
+| **POST** | `/associations/` | Crea una relación entre un libro y un autor | `?book_id=1&author_id=2` | ✅ **201** → Asociación creada <br> ⚠️ **404** → Libro o autor no encontrado/inactivo <br> ⚠️ **409** → Asociación ya existente |
+| **GET** | `/associations/` | Lista todas las asociaciones libro-autor existentes | - | ✅ **200** → Lista de asociaciones <br> ⚠️ **404** → No existen asociaciones registradas |
+| **DELETE** | `/associations/` | Elimina una relación entre un libro y un autor | `?book_id=1&author_id=2` | ✅ **200** → Asociación eliminada <br> ⚠️ **404** → Asociación no encontrada |
+
+---
+
+### ⚠️ Manejo de errores HTTP
+
+| Código | Tipo | Descripción | Causa común |
+|--------|------|-------------|--------------|
+| **200 OK** | Éxito | La solicitud se procesó correctamente. | Operaciones `GET` o `DELETE` exitosas. |
+| **201 Created** | Creación | Recurso creado correctamente. | Asociación o registro nuevo insertado. |
+| **400 Bad Request** | Error del cliente | Solicitud mal formada o con datos inválidos. | Datos faltantes o tipos de dato incorrectos. |
+| **404 Not Found** | No encontrado | El recurso solicitado no existe o está inactivo. | Libro, autor o asociación inexistente. |
+| **409 Conflict** | Conflicto | El recurso ya existe o viola una restricción. | Asociación duplicada o conflicto de datos. |
+
+
+### 🧱 Estructura del proyecto
+
     
-⚙️ Endpoints principales
-📚 Books
-Método	Endpoint	Descripción	Cuerpo esperado
-GET	/books/	        Obtiene todos los libros activos	
-GET	/books/{id}	Obtiene un libro específico	
-POST	/books/ 	Crea un nuevo libro	{ "title": "string", "isbn": "string", "year_publication": 0, "copies_available": 0, "author_ids": [1,2] }
-PUT	/books/{id}	Actualiza los datos de un libro y sus autores	Igual que POST
-DELETE	/books/{id}	Desactiva (elimina lógicamente) un libro	—
-
-✍️ Authors
-Método	Endpoint	Descripción	Cuerpo esperado
-GET	/authors/	Lista todos los autores activos
-GET	/authors/{id}	Muestra un autor específico	
-POST	/authors/	Crea un nuevo autor	{ "name": "string", "country": "string", "birth_year": 0 }
-PUT	/authors/{id}	Actualiza los datos de un autor	Igual que POST
-DELETE	/authors/{id}	Desactiva (elimina lógicamente) un autor	—
-
-🧱 Estructura del proyecto
-
-
-    parcial2/
-    ├─ crud.py
-    ├─ db.py
-    ├─ main.py
-    ├─ models.py
-    ├─ schemas.py
-    ├─ requirements.txt
-    └─ routes/
-       ├─ authors.py
-       └─ books.py
+    
+        parcial2/
+        ├─ crud.py
+        ├─ db.py
+        ├─ main.py
+        ├─ models.py
+        ├─ schemas.py
+        ├─ requirements.txt
+        └─ routes/
+           ├─ authors.py
+           └─ books.py
